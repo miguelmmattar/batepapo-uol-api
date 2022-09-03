@@ -6,8 +6,14 @@ import joi from 'joi';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const participantsSchema = joi.object({
+const participantSchema = joi.object({
     name: joi.string().empty().required()
+});
+
+const messageSchema = joi.object({
+    to: joi.string().empty().required(),
+    text: joi.string().empty().required(),
+    type: joi.valid('message', 'private_message').required()
 });
 
 const app = express();
@@ -38,7 +44,7 @@ app.post('/participants', async (req, res) => {
             return;
         }
 
-        const validation = participantsSchema.validate(req.body, { abortEarly: false });
+        const validation = participantSchema.validate(req.body, { abortEarly: false });
 
         if(validation.error) {
             const errors = validation.error.details.map(detail => detail.message);
@@ -83,20 +89,40 @@ app.get('/participants', async (req, res) => {
     res.send(participants);
 });
 
-app.post('/messages', (req, res) => {
+app.post('/messages', async (req, res) => {
     const { to, text, type } = req.body;
     const  from  = req.headers.user;
-    const time = dayjs().format('hh:mm:ss');
 
-     if(!to || !text || !from || to === "" || text === "" || (type !== 'message' && type !== 'private_message')/*  || !participants.find(user => user === from) */) {
-        res.status(422).send({message: 'Os campos devem ser preenchidos com informações válidas!'});
-        return;
-    }
-    
-    const message = {to, text, type, from, time};
-    console.log(message);
+    try {
+        const response = await db
+            .collection('participants')
+            .findOne({name: from});
 
-    res.sendStatus(201);
+        const validation = messageSchema.validate(req.body, { abortEarly: false });
+
+        if(!response ) {
+            res.status(422).send('Este participante não existe!');
+        }
+
+        if(validation.error) {
+            const errors = validation.error.details.map(detail => detail.message);
+            res.status(422).send(errors);
+        }
+
+        await db
+            .collection('messages')
+            .insertOne({
+                from, 
+                to, 
+                text, 
+                type, 
+                time: dayjs().format('hh:mm:ss')
+            });
+
+        res.sendStatus(201);
+    } catch(error) {
+        res.status(500).send(error.message);
+    }  
 });
 
 app.get('/messages', (req, res) => {
