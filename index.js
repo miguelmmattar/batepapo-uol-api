@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { response } from 'express';
 import cors from 'cors';
 import dayjs from 'dayjs';
 import { MongoClient } from 'mongodb';
@@ -175,14 +175,35 @@ app.post('/status', async (req, res) => {
     }   
 });
 
-setInterval(() => {
-    participants.forEach((participant, index) => {
-        if(Date.now() - participants.lastStatus > 10000) {
-            participants.splice(index, 1);
-        }
-    });
-    
-}, 15000);
+async function autoRemove() {
+    try {
+        const toRemove = await db
+            .collection('participants')
+            .find({ lastStatus: {$lt: (Date.now() - 10)}})
+            .toArray();
+
+        await toRemove.forEach(participant => {
+            db
+                .collection('messages')
+                .insertOne({
+                    from: participant.name, 
+                    to: 'Todos', 
+                    text: 'sai da sala...', 
+                    type: 'status', 
+                    time: dayjs().format('hh:mm:ss')
+                });
+
+            db
+                .collection('participants')
+                .deleteOne({ name: participant.name });
+        });
+        } catch(error) {
+            console.log(error.message);
+        }       
+}
+
+
+setInterval(autoRemove, 15000);
 
 
 app.listen(5000, () => console.log('Listening on port 5000'));
