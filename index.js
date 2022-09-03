@@ -125,18 +125,28 @@ app.post('/messages', async (req, res) => {
     }  
 });
 
-app.get('/messages', (req, res) => {
+app.get('/messages', async (req, res) => {
     const limit = parseInt(req.query.limit);
     const { user } = req.headers;
 
-    let allowed_messages = messages.filter(message => (message.to === user || message.from === user || message.type === 'private_message'));
+    try {
+        let response = await db
+            .collection('messages')
+            .find()
+            .toArray();
+            
+        let allowed_messages = response.filter(message => (message.to === user || 
+            message.from === user || 
+            message.type === 'message'));
 
-    if(limit) {
-        allowed_messages = allowed_messages.slice(limit * -1);
-    }
-   
+        if(limit) {
+            allowed_messages = allowed_messages.slice(limit * -1);
+        }
 
-    res.send(allowed_messages);
+        res.send(allowed_messages);
+    } catch(error) {
+        res.status(500).send(error.message);
+    }   
 });
 
 app.post('/status', (req, res) => {
