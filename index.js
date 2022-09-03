@@ -69,9 +69,16 @@ app.post('/participants', async (req, res) => {
     }
 });
 
-app.get('/participants', (req, res) => {
-    
-    //falta popular a lista
+app.get('/participants', async (req, res) => {
+    try {
+        res.send(await db
+            .collection('participants')
+            .find()
+            .toArray()
+        );        
+    } catch(error) {
+        res.status(500).send(error.message);
+    }
 
     res.send(participants);
 });
