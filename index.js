@@ -107,6 +107,7 @@ app.post('/messages', async (req, res) => {
         if(validation.error) {
             const errors = validation.error.details.map(detail => detail.message);
             res.status(422).send(errors);
+            return;
         }
 
         await db
@@ -204,6 +205,56 @@ app.delete('/messages/:messageId', async (req, res) => {
     }
 });
 
+app.put('/messages/:messageId', async (req, res) => {
+    const { to, text, type } = req.body;
+    const from = req.headers.user;
+    const { messageId } = req.params;
+
+    try {
+        let response = await db
+            .collection('participants')
+            .findOne({name: from});
+
+        const validation = messageSchema.validate(req.body, { abortEarly: false });
+
+        if(!response ) {
+            res.status(422).send('Este participante não existe!');
+        }
+
+        if(validation.error) {
+            const errors = validation.error.details.map(detail => detail.message);
+            res.status(422).send(errors);
+            return;
+        }
+
+        response = await db
+            .collection('messages')
+            .findOne({ _id: ObjectId(messageId) });
+
+        if(!response) {
+            res.status(404).send('Não foi possível encontrar esta mensagem!');
+            return;
+        }
+
+        if(from !== response.from) {
+            res.status(401).send('Não é possível deletar mensagens de outros participantes!');
+            return;
+        }
+
+        await db
+            .collection('messages')
+            .updateOne({ _id: ObjectId(messageId) }, { $set: {
+                to,
+                text,
+                type
+            } 
+        });
+
+        res.sendStatus(200);
+    } catch(error) {
+        res.status(500).send(error.message);
+    }
+});
 
 async function autoRemove() {
     try {
@@ -233,8 +284,5 @@ async function autoRemove() {
 }
 
 setInterval(autoRemove, 15000);
-
-
-
 
 app.listen(5000, () => console.log('Listening on port 5000'));
