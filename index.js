@@ -1,7 +1,7 @@
 import express, { response } from 'express';
 import cors from 'cors';
 import dayjs from 'dayjs';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import joi from 'joi';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -150,7 +150,7 @@ app.get('/messages', async (req, res) => {
 });
 
 app.post('/status', async (req, res) => {
-    const  user  = req.headers.user;
+    const { user } = req.headers;
     
     try {
         const response = await db
@@ -174,6 +174,36 @@ app.post('/status', async (req, res) => {
         res.status(500).send(error.message);
     }   
 });
+
+app.delete('/messages/:messageId', async (req, res) => {
+    const { user } = req.headers;
+    const { messageId } = req.params;
+
+    try {
+        let response = await db
+            .collection('messages')
+            .findOne({ _id: ObjectId(messageId) });
+
+        if(!response) {
+            res.status(404).send('Não foi possível encontrar esta mensagem!');
+            return;
+        }
+
+        if(user !== response.from) {
+            res.status(401).send('Não é possível deletar mensagens de outros participantes!');
+            return;
+        }
+        
+        response = await db
+            .collection('messages')
+            .deleteOne({ _id: ObjectId(messageId) });
+
+        res.send(response);
+    } catch(error) {
+        res.status(500).send(error.message);
+    }
+});
+
 
 async function autoRemove() {
     try {
@@ -202,8 +232,9 @@ async function autoRemove() {
         }       
 }
 
-
 setInterval(autoRemove, 15000);
+
+
 
 
 app.listen(5000, () => console.log('Listening on port 5000'));
