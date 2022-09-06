@@ -1,4 +1,4 @@
-import express, { response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dayjs from 'dayjs';
 import { MongoClient, ObjectId } from 'mongodb';
